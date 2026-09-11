@@ -1,0 +1,462 @@
+// ==================================================
+// PANASEA — Prisma Schema
+// ==================================================
+// BATCH 1: datasource/generator wiring only, proven via /api/health.
+// BATCH 2: User, Role, Permission, RolePermission (auth).
+// BATCH 3: Unit, Category, Product, ProductVariant, Addon, ProductAddon,
+//          Ingredient, Supplier, InventoryMovement (master data + inventory).
+//
+// Planned entities for BATCH 4+ (reference only — not yet defined here):
+//   recipes, recipe_items, purchase_orders, purchase_items, customers,
+//   customer_points, promotions, transactions, transaction_items,
+//   payments, refunds, shifts, expenses, audit_logs, store_settings
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // SQLite for BATCH 1 so the project runs with zero external services.
+  // Swap to "postgresql" here (and update DATABASE_URL) when a real
+  // Postgres instance is available — the rest of the app only ever
+  // talks to Prisma Client, so no application code needs to change.
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ==================================================
+// BATCH 2 — Auth & Authorization
+// ==================================================
+// Roles and permissions are real tables (not hardcoded enums) so new
+// roles/permissions can be added later purely through data — no code
+// changes to the authorization logic in src/lib/auth are required.
+
+model Role {
+  id          String           @id @default(cuid())
+  /// e.g. "OWNER", "CASHIER". Unique so it can be looked up by name.
+  name        String           @unique
+  description String?
+  users       User[]
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Permission {
+  id          String           @id @default(cuid())
+  /// Dotted permission key, e.g. "pos.access", "inventory.manage".
+  key         String           @unique
+  description String?
+  roles       RolePermission[]
+  createdAt   DateTime         @default(now())
+}
+
+/// Explicit join table (rather than an implicit m-n) so it can later carry
+/// its own metadata (e.g. grantedAt, grantedBy) without a schema rewrite.
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  /// bcrypt hash — never the plaintext password.
+  passwordHash String
+  roleId       String
+  role         Role     @relation(fields: [roleId], references: [id])
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  inventoryMovements InventoryMovement[]
+  orders             Order[]
+  paymentsCreated    Payment[]            @relation("PaymentCreatedBy")
+  paymentsConfirmed  Payment[]            @relation("PaymentConfirmedBy")
+
+  @@index([roleId])
+  shifts Shift[]
+}
+
+// ==================================================
+// BATCH 3 — Master Data & Inventory
+// ==================================================
+
+/// One base unit per measurement family (Gram for weight, Milliliter for
+/// volume, Pcs for count) with conversionToBase = 1; other units in the
+/// same family point to that base via baseUnitId + conversionToBase (e.g.
+/// Kilogram -> base Gram, conversionToBase 1000). This is the single
+/// source of truth for conversion — see src/lib/inventory/unit-conversion.ts.
+model Unit {
+  id               String   @id @default(cuid())
+  name             String   @unique
+  symbol           String   @unique
+  /// "WEIGHT" | "VOLUME" | "COUNT"
+  type             String
+  baseUnitId       String?
+  baseUnit         Unit?    @relation("UnitBase", fields: [baseUnitId], references: [id])
+  derivedUnits     Unit[]   @relation("UnitBase")
+  /// 1 of this unit = conversionToBase of its base unit (1 if this unit IS the base).
+  conversionToBase Float    @default(1)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  ingredients        Ingredient[]
+  inventoryMovements InventoryMovement[]
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  /// Simple icon key (e.g. a lucide icon name) — no image upload in this batch.
+  icon        String?
+  isActive    Boolean   @default(true)
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+  /// Not globally unique on purpose — two products can share a display
+  /// name in real menus (e.g. seasonal variants). SKU is the unique code.
+  name        String
+  description String?
+  sku         String?  @unique
+  /// Rupiah, whole-number integer — see src/lib/validation/common.ts moneySchema.
+  price       Int
+  /// Optional manual HPP reference. Recipe-based auto-HPP is a later batch.
+  costPrice   Int?
+  isActive    Boolean  @default(true)
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  variants ProductVariant[]
+  addons   ProductAddon[]
+  recipes  Recipe[]
+  orderItems OrderItem[]
+
+  @@index([categoryId])
+}
+
+model ProductVariant {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  /// "Regular", "Large", ...
+  name      String
+  /// Final price for this variant (not a delta) — simplest for POS to consume later.
+  price     Int
+  sku       String?  @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  recipes    Recipe[]
+  orderItems OrderItem[]
+
+  @@index([productId])
+}
+
+model Addon {
+  id        String         @id @default(cuid())
+  name      String         @unique
+  price     Int
+  isActive  Boolean        @default(true)
+  products  ProductAddon[]
+  orderItemAddons OrderItemAddon[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+/// Explicit join table: which add-ons are offered on which products.
+model ProductAddon {
+  productId String
+  addonId   String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  addon     Addon   @relation(fields: [addonId], references: [id], onDelete: Cascade)
+
+  @@id([productId, addonId])
+  @@index([addonId])
+}
+
+model Ingredient {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  sku          String?  @unique
+  unitId       String
+  unit         Unit     @relation(fields: [unitId], references: [id])
+  /// Cost per unit of this ingredient (e.g., price per gram or ml)
+  cost         Float?   // optional, null means unknown cost
+  /// Cached running total — always changed together with an InventoryMovement
+  /// row in the same DB transaction (see inventory-service.ts). Never write
+  /// to this field directly anywhere else.
+  currentStock Float    @default(0)
+  minimumStock Float    @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  movements   InventoryMovement[]
+  recipeItems RecipeItem[]
+
+  @@index([unitId])
+}
+
+model Supplier {
+  id            String   @id @default(cuid())
+  name          String
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  notes         String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+/// The append-only ledger that IS the source of truth for stock. Ingredient
+/// .currentStock is a cache derived from this history, never mutated on its
+/// own — see requireSession()-gated inventory-service.ts for the only
+/// place that writes both together, inside a single db.$transaction.
+model InventoryMovement {
+  id           String     @id @default(cuid())
+  ingredientId String
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+  /// "STOCK_IN" | "STOCK_OUT" | "ADJUSTMENT_IN" | "ADJUSTMENT_OUT"
+  /// Ready to extend with PURCHASE / SALE / WASTE / RETURN / STOCK_OPNAME
+  /// in a later batch without a schema change.
+  type          String
+  /// Always positive — direction comes from `type`.
+  quantity      Float
+  unitId        String
+  unit          Unit     @relation(fields: [unitId], references: [id])
+  /// Free-form pointer to the record that caused this movement once
+  /// purchasing/POS exist (e.g. referenceType "PURCHASE", referenceId = PO id).
+  referenceType String?
+  referenceId   String?
+  note          String?
+  createdById   String
+  createdBy     User     @relation(fields: [createdById], references: [id])
+  createdAt     DateTime @default(now())
+
+  @@index([ingredientId])
+  @@index([createdAt])
+}
+
+// ==================================================
+// BATCH 4 — Recipes (Product → Ingredients mapping)
+// ==================================================
+
+/// A recipe maps a Product (optionally a specific variant) to the list of
+/// ingredients consumed when one unit of that product is sold.
+/// If variantId is null, the recipe applies to the base product / all
+/// variants that don't have their own specific recipe.
+model Recipe {
+  id        String       @id @default(cuid())
+  productId String
+  product   Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  /// Display label, e.g. "Resep Latte (Regular)"
+  name      String
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  items     RecipeItem[]
+
+  @@unique([productId, variantId])
+  @@index([productId])
+}
+
+/// One ingredient line in a recipe: "18 g of Coffee Beans per 1 unit of product".
+model RecipeItem {
+  id           String     @id @default(cuid())
+  recipeId     String
+  recipe       Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredientId String
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+  /// Quantity of ingredient consumed per ONE unit of the product, in the
+  /// ingredient's own unit. E.g. 18 (grams) for Coffee Beans per 1 Latte.
+  quantity     Float
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([recipeId, ingredientId])
+  @@index([recipeId])
+  @@index([ingredientId])
+}
+
+
+// ==================================================
+// BATCH 5 — POS / Cashier Workflow
+// ==================================================
+
+model Order {
+  id            String   @id @default(cuid())
+  /// Human-readable order number, e.g. "PS-20260907-001"
+  orderNumber   String   @unique
+  /// "DRAFT" | "HELD" | "OPEN" | "CANCELLED" | "COMPLETED"
+  status        String   @default("DRAFT")
+  
+  cashierId     String
+  cashier       User     @relation(fields: [cashierId], references: [id])
+  
+  /// All these are stored as snapshots so historical orders don't break
+  /// if product prices change later.
+  subtotal      Int      @default(0)
+  discount      Int      @default(0)
+  tax           Int      @default(0)
+  serviceCharge Int      @default(0)
+  grandTotal    Int      @default(0)
+  
+  notes         String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  items         OrderItem[]
+  payment       Payment?
+
+  @@index([cashierId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id         String   @id @default(cuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id])
+  
+  variantId  String?
+  variant    ProductVariant? @relation(fields: [variantId], references: [id])
+  
+  quantity   Int
+  /// Price per unit at the time of order (snapshot)
+  unitPrice  Int
+  notes      String?
+  /// Snapshot line total (quantity * unitPrice + addons)
+  lineTotal  Int
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  addons     OrderItemAddon[]
+
+  @@index([orderId])
+  @@index([productId])
+  @@index([variantId])
+}
+
+model OrderItemAddon {
+  id          String   @id @default(cuid())
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  
+  addonId     String
+  addon       Addon     @relation(fields: [addonId], references: [id])
+  
+  /// Price of addon at the time of order (snapshot)
+  price       Int
+
+  createdAt   DateTime @default(now())
+
+  @@index([orderItemId])
+  @@index([addonId])
+}
+
+// ==================================================
+// BATCH 6 — Payment
+// ==================================================
+
+model Payment {
+  id              String   @id @default(cuid())
+  orderId         String   @unique
+  order           Order    @relation(fields: [orderId], references: [id])
+  
+  /// "CASH" | "QRIS"
+  paymentMethod   String
+  /// "PENDING" | "PAID" | "FAILED" | "CANCELLED"
+  status          String   @default("PENDING")
+  
+  /// Amount the customer must pay (= order grandTotal, snapshotted).
+  amount          Int
+  /// For CASH: the amount actually tendered by the customer.
+  amountTendered  Int?
+  /// For CASH: amount - amountTendered, always >= 0.
+  changeAmount    Int?
+  
+  /// External reference number if a real provider is integrated later.
+  referenceNumber String?
+  
+  paidAt          DateTime?
+  
+  createdById     String
+  createdBy       User     @relation("PaymentCreatedBy", fields: [createdById], references: [id])
+  
+  /// Who confirmed the payment (for QRIS manual confirmation flow).
+  confirmedById   String?
+  confirmedBy     User?    @relation("PaymentConfirmedBy", fields: [confirmedById], references: [id])
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ==================================================
+// BATCH 7 — Shift Management
+// ==================================================
+
+model Shift {
+  id           String   @id @default(cuid())
+  cashierId    String
+  cashier      User     @relation(fields: [cashierId], references: [id])
+  openedAt     DateTime @default(now())
+  closedAt     DateTime?
+  openingCash  Int
+  closingCash  Int?
+  cashDiff     Int?
+  status       String   @default("OPEN") // OPEN | CLOSED
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([cashierId])
+  @@index([status])
+}
+
+model StoreSetting {
+  id             String   @id @default(cuid())
+  name           String?
+  address        String?
+  phone          String?
+  email          String?
+  logoUrl        String?
+  currency       String?  @default("IDR")
+  taxRate        Float?   @default(0)
+  serviceCharge  Float?   @default(0)
+  receiptHeader  String?
+  receiptFooter  String?
+  printerName    String?
+  timezone       String?  @default("Asia/Jakarta")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
