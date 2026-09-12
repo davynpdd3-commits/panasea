@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { requireSession } from '@/lib/auth/session';
 import { requirePermission } from '@/lib/auth/permissions';
