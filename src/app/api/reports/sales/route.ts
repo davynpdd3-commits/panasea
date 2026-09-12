@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+
+export const dynamic = 'force-dynamic'; // Ensure route is always treated as dynamic during build
 import { requireSession } from '@/lib/auth/session';
 import { requirePermission } from '@/lib/auth/permissions';
 import {
