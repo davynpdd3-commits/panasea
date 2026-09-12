@@ -20,7 +20,7 @@ datasource db {
   // Swap to "postgresql" here (and update DATABASE_URL) when a real
   // Postgres instance is available — the rest of the app only ever
   // talks to Prisma Client, so no application code needs to change.
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
