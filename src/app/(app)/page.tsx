@@ -5,7 +5,7 @@ import { getCurrentSession } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
 import { db } from "@/lib/db";
 import { countLowStock } from "@/lib/services/inventory-service";
-
+export const dynamic = 'force-dynamic';
 const ROLE_LABELS: Record<string, string> = {
   OWNER: "Owner",
   CASHIER: "Cashier",
