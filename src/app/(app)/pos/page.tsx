@@ -4,6 +4,8 @@ import { requireSession } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
 import { redirect } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 export default async function PosPage() {
   const session = await requireSession();
 
