@@ -1,6 +1,8 @@
 import { db } from "@/lib/db";
 import { apiHandler, ok } from "@/lib/api-response";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/health
  *

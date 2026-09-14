@@ -3,6 +3,8 @@ import { requireSession } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/auth/permissions";
 import { listUsers } from "@/lib/services/user-service";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/users
  *

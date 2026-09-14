@@ -3,6 +3,8 @@ import { requireSession } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/auth/permissions";
 import { listUnits } from "@/lib/services/unit-service";
 
+export const dynamic = "force-dynamic";
+
 export const GET = apiHandler(async () => {
   const session = await requireSession();
   requirePermission(session, "inventory.view");

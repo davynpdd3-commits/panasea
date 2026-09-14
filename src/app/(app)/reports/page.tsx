@@ -3,6 +3,8 @@ import { requireSession } from '@/lib/auth/session';
 import { requirePermission } from '@/lib/auth/permissions';
 import ReportsDashboard from '@/components/reports/ReportsDashboard';
 
+export const dynamic = "force-dynamic";
+
 export default async function ReportsPage() {
   const session = await requireSession();
   requirePermission(session, 'reports.view');

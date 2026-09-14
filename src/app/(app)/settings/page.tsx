@@ -3,6 +3,8 @@ import { requirePermission } from '@/lib/auth/permissions';
 import SettingsForm from '@/components/settings/SettingsForm';
 import { redirect } from 'next/navigation';
 
+export const dynamic = "force-dynamic";
+
 export default async function SettingsPage() {
   const session = await requireSession();
   // Only OWNER (settings.manage) can view
