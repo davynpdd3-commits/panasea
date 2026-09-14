@@ -5,6 +5,8 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { updateVariantSchema } from "@/lib/validation/product";
 import { deleteVariant, updateVariant } from "@/lib/services/product-service";
 
+export const dynamic = "force-dynamic";
+
 export const PATCH = apiHandler(
   async (request: NextRequest, context: { params: { id: string; variantId: string } }) => {
     const session = await requireSession();

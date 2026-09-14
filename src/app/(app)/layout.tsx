@@ -3,6 +3,8 @@ import { AppShell } from "@/components/layout/AppShell";
 import { ToastProvider } from "@/components/ui/toast";
 import { getCurrentSession } from "@/lib/auth/session";
 
+export const dynamic = "force-dynamic";
+
 export default async function AppLayout({
   children,
 }: {

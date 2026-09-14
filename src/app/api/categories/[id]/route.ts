@@ -5,6 +5,8 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { updateCategorySchema } from "@/lib/validation/category";
 import { deleteCategory, updateCategory } from "@/lib/services/category-service";
 
+export const dynamic = "force-dynamic";
+
 export const PATCH = apiHandler(async (request: NextRequest, context: { params: { id: string } }) => {
   const session = await requireSession();
   requirePermission(session, "products.manage");

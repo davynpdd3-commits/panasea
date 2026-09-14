@@ -5,6 +5,8 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { createAddonSchema } from "@/lib/validation/addon";
 import { createAddon, listAddons } from "@/lib/services/addon-service";
 
+export const dynamic = "force-dynamic";
+
 export const GET = apiHandler(async (request: NextRequest) => {
   const session = await requireSession();
   requirePermission(session, "products.view");

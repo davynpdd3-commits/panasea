@@ -5,6 +5,8 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { createSupplierSchema } from "@/lib/validation/supplier";
 import { createSupplier, listSuppliers } from "@/lib/services/supplier-service";
 
+export const dynamic = "force-dynamic";
+
 export const GET = apiHandler(async (request: NextRequest) => {
   const session = await requireSession();
   requirePermission(session, "purchasing.view");

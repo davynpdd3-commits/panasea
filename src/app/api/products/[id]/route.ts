@@ -5,6 +5,8 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { updateProductSchema } from "@/lib/validation/product";
 import { deleteProduct, getProduct, updateProduct } from "@/lib/services/product-service";
 
+export const dynamic = "force-dynamic";
+
 export const GET = apiHandler(async (_request: NextRequest, context: { params: { id: string } }) => {
   const session = await requireSession();
   requirePermission(session, "products.view");

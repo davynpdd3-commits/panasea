@@ -5,6 +5,8 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { updateAddonSchema } from "@/lib/validation/addon";
 import { deleteAddon, updateAddon } from "@/lib/services/addon-service";
 
+export const dynamic = "force-dynamic";
+
 export const PATCH = apiHandler(async (request: NextRequest, context: { params: { id: string } }) => {
   const session = await requireSession();
   requirePermission(session, "products.manage");

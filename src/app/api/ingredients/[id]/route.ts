@@ -5,6 +5,8 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { updateIngredientSchema } from "@/lib/validation/ingredient";
 import { deleteIngredient, getIngredient, updateIngredient } from "@/lib/services/ingredient-service";
 
+export const dynamic = "force-dynamic";
+
 export const GET = apiHandler(async (_request: NextRequest, context: { params: { id: string } }) => {
   const session = await requireSession();
   requirePermission(session, "inventory.view");

@@ -5,6 +5,8 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { createVariantSchema } from "@/lib/validation/product";
 import { createVariant } from "@/lib/services/product-service";
 
+export const dynamic = "force-dynamic";
+
 export const POST = apiHandler(async (request: NextRequest, context: { params: { id: string } }) => {
   const session = await requireSession();
   requirePermission(session, "products.manage");

@@ -5,6 +5,8 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { createCategorySchema } from "@/lib/validation/category";
 import { createCategory, listCategories } from "@/lib/services/category-service";
 
+export const dynamic = "force-dynamic";
+
 export const GET = apiHandler(async (request: NextRequest) => {
   const session = await requireSession();
   requirePermission(session, "products.view");

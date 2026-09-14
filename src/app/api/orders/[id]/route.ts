@@ -6,6 +6,8 @@ import { apiHandler, ok } from "@/lib/api-response";
 import { NotFoundError } from "@/lib/errors";
 import { updateOrderStatus, getOrderById } from "@/lib/services/order-service";
 
+export const dynamic = "force-dynamic";
+
 const updateOrderStatusSchema = z.object({
   status: z.enum(["DRAFT", "HELD", "OPEN", "CANCELLED", "COMPLETED"]),
 });

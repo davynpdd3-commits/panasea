@@ -5,6 +5,8 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { createRecipeSchema, recipeListQuerySchema } from "@/lib/validation/recipe";
 import { createRecipe, listRecipes } from "@/lib/services/recipe-service";
 
+export const dynamic = "force-dynamic";
+
 export const GET = apiHandler(async (request: NextRequest) => {
   const session = await requireSession();
   requirePermission(session, "recipes.view");

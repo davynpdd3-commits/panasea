@@ -11,6 +11,8 @@ import {
   SESSION_COOKIE_NAME,
 } from "@/lib/auth/jwt";
 
+export const dynamic = "force-dynamic";
+
 export const POST = apiHandler(async (request: NextRequest) => {
   const rawBody = await request.json().catch(() => {
     throw new ValidationError("Data yang dikirim tidak valid.");

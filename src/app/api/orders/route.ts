@@ -5,6 +5,8 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { apiHandler, created } from "@/lib/api-response";
 import { createOrder, OrderStatus } from "@/lib/services/order-service";
 
+export const dynamic = "force-dynamic";
+
 const orderItemSchema = z.object({
   productId: z.string(),
   variantId: z.string().nullable().optional(),

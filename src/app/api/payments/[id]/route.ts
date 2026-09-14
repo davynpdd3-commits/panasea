@@ -10,6 +10,8 @@ import {
 } from "@/lib/services/payment-service";
 import { NotFoundError } from "@/lib/errors";
 
+export const dynamic = "force-dynamic";
+
 const updatePaymentSchema = z.object({
   action: z.enum(["confirm", "cancel"]),
 });

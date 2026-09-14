@@ -9,6 +9,8 @@ import {
   listPayments,
 } from "@/lib/services/payment-service";
 
+export const dynamic = "force-dynamic";
+
 const cashPaymentSchema = z.object({
   orderId: z.string().min(1),
   paymentMethod: z.literal("CASH"),
