@@ -11,15 +11,29 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-export const db =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log:
-      process.env.NODE_ENV === "development"
-        ? ["warn", "error"]
-        : ["error"],
-  });
+let prismaInstance: PrismaClient | undefined;
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = db;
+if (process.env.DATABASE_URL) {
+  prismaInstance =
+    globalForPrisma.prisma ??
+    new PrismaClient({
+      log:
+        process.env.NODE_ENV === "development"
+          ? ["warn", "error"]
+          : ["error"],
+    });
+  if (process.env.NODE_ENV !== "production") {
+    globalForPrisma.prisma = prismaInstance;
+  }
+} else {
+  console.warn("[db] DATABASE_URL not set; PrismaClient will not be initialized during build.");
+  // Proxy that throws on any property access
+  const handler = {
+    get(_: any, prop: string) {
+      throw new Error(`PrismaClient not initialized (missing DATABASE_URL) when accessing property "${prop}"`);
+    },
+  };
+  prismaInstance = new Proxy({}, handler) as unknown as PrismaClient;
 }
+
+export const db = prismaInstance as PrismaClient;
